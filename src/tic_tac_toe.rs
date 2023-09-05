@@ -2,25 +2,25 @@ use std::fmt;
 use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum Player {
+pub(crate) enum Player {
     X,
     O,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum Spot {
+pub(crate) enum Spot {
     Empty,
     Filled(Player),
 }
 
-#[derive(Debug)]
-struct TicTacToe {
+#[derive(Debug, Clone)]
+pub(crate) struct TicTacToe {
     spots: [[Spot; 3]; 3],
-    current_player: Player,
+    pub(crate) current_player: Player,
 }
 
 impl TicTacToe {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             spots: [[Spot::Empty; 3]; 3],
             current_player: Player::X,
@@ -28,7 +28,7 @@ impl TicTacToe {
     }
 
     // Take a step with a given action
-    pub fn step(&mut self, row: usize, col: usize) -> Result<f32> {
+    pub(crate) fn step(&mut self, row: usize, col: usize) -> Result<f32> {
         match self.spots[row][col] {
             Spot::Empty => {
                 self.spots[row][col] = Spot::Filled(self.current_player.clone());
@@ -45,8 +45,20 @@ impl TicTacToe {
         }
     }
 
+    pub(crate) fn get_available_moves(&self) -> Vec<(usize, usize)> {
+        let mut available_moves = Vec::new();
+        for (i, row) in self.spots.iter().enumerate() {
+            for (j, &spot) in row.iter().enumerate() {
+                if spot == Spot::Empty {
+                    available_moves.push((i, j));
+                }
+            }
+        }
+        available_moves
+    }
+
     // Check if there's a winner
-    pub fn check_winner(&self) -> Option<Player> {
+    pub(crate) fn check_winner(&self) -> Option<Player> {
         // Check rows
         for row in 0..3 {
             if let Spot::Filled(player) = self.spots[row][0] {
