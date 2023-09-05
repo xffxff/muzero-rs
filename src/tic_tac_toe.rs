@@ -1,4 +1,5 @@
 use std::fmt;
+use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Player {
@@ -27,7 +28,7 @@ impl TicTacToe {
     }
 
     // Take a step with a given action
-    pub fn step(&mut self, row: usize, col: usize) -> Result<f32, &'static str> {
+    pub fn step(&mut self, row: usize, col: usize) -> Result<f32> {
         match self.spots[row][col] {
             Spot::Empty => {
                 self.spots[row][col] = Spot::Filled(self.current_player.clone());
@@ -40,7 +41,7 @@ impl TicTacToe {
                 let reward = if terminated { 1.0 } else { 0.0 }; // Implement according to your needs
                 Ok(reward)
             },
-            Spot::Filled(_) => Err("Spot is already filled"),
+            Spot::Filled(_) => bail!("Spot is already filled"),
         }
     }
 
@@ -111,15 +112,15 @@ mod tests {
     #[test]
     fn test_step() {
         let mut game = TicTacToe::new();
-        assert_eq!(game.step(0, 0), Ok(0.0));
+        assert!(game.step(0, 0).is_ok());
         assert_eq!(game.spots[0][0], Spot::Filled(Player::X));
         assert_eq!(game.current_player, Player::O);
 
-        assert_eq!(game.step(0, 0), Err("Spot is already filled"));
+        assert!(game.step(0, 0).is_err());
         assert_eq!(game.spots[0][0], Spot::Filled(Player::X));
         assert_eq!(game.current_player, Player::O);
 
-        assert_eq!(game.step(0, 1), Ok(0.0));
+        assert!(game.step(0, 1).is_ok());
         assert_eq!(game.spots[0][1], Spot::Filled(Player::O));
         assert_eq!(game.current_player, Player::X);
     }
