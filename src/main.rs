@@ -3,14 +3,14 @@ mod mcts;
 
 use std::io;
 
-use mcts::Mcts;
+use mcts::MCTS;
 use tic_tac_toe::TicTacToe;
 
 use crate::tic_tac_toe::Player;
 
 fn main() -> anyhow::Result<()> {
     let mut game = TicTacToe::new();
-    let mcts = Mcts::new(1.41, 1000);  // exploration constant = sqrt(2), number of simulations = 1000
+    let mcts = MCTS {};
 
     loop {
         println!("{}", game);
