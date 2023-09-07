@@ -45,29 +45,7 @@ impl<T: Game> Node<T> {
     }
 }
 
-struct Database<T: Game> {
-    nodes: HashMap<NodeId, Node<T>>,
-}
-
-impl<T: Game> Database<T> {
-    fn new() -> Self {
-        Self {
-            nodes: HashMap::new(),
-        }
-    }
-
-    fn get(&self, id: NodeId) -> Option<&Node<T>> {
-        self.nodes.get(&id)
-    }
-
-    fn get_mut(&mut self, id: NodeId) -> Option<&mut Node<T>> {
-        self.nodes.get_mut(&id)
-    }
-
-    fn insert(&mut self, id: NodeId, node: Node<T>) {
-        self.nodes.insert(id, node);
-    }
-}
+type NodeMap<T> = HashMap<NodeId, Node<T>>;
 
 impl<T: Game> Mcts<T> {
     pub(crate) fn new() -> Self {
@@ -79,7 +57,7 @@ impl<T: Game> Mcts<T> {
     pub(crate) fn select_move(&self, game: &T) -> anyhow::Result<T::Action> {
         let root = Node::new(game);
         let root_id = NodeId::new();
-        let mut db = Database::new();
+        let mut db = NodeMap::new();
         db.insert(root_id, root);
         for _ in 0..200 {
             let game = &mut game.clone();
@@ -95,7 +73,7 @@ impl<T: Game> Mcts<T> {
         Ok(best_action)
     }
 
-    fn print_tree(root: NodeId, db: &Database<T>, indent: usize) -> String {
+    fn print_tree(root: NodeId, db: &NodeMap<T>, indent: usize) -> String {
         fn indent_str(indent: usize) -> String {
             let mut s = "".to_string();
             for _ in 0..indent {
@@ -104,7 +82,7 @@ impl<T: Game> Mcts<T> {
             s
         }
         let mut s = String::new();
-        let node = db.get(root).unwrap();
+        let node = db.get(&root).unwrap();
 
         if indent == 0 {
             s.push_str(&format!(
@@ -113,22 +91,22 @@ impl<T: Game> Mcts<T> {
             ));
         }
 
-        for (action, &child_id) in node.children.iter() {
+        for (action, child_id) in node.children.iter() {
             let child = db.get(child_id).unwrap();
             s.push_str(indent_str(indent).as_str());
             s.push_str(&format!(
                 "  {:?} make move {:?} win rate for {:?}: {:?}/{:?} \n",
                 node.to_play, action, child.to_play, child.wins, child.visits
             ));
-            s.push_str(&Self::print_tree(child_id, db, indent + 4));
+            s.push_str(&Self::print_tree(*child_id, db, indent + 4));
         }
         s
     }
 
-    fn tree_policy(&self, root: NodeId, db: &mut Database<T>, game: &mut T) -> NodeId {
+    fn tree_policy(&self, root: NodeId, db: &mut NodeMap<T>, game: &mut T) -> NodeId {
         let mut node_id = root;
         loop {
-            let node = db.get(node_id).unwrap();
+            let node = db.get(&node_id).unwrap();
             if node.done {
                 debug!("Found a winner");
                 break;
@@ -145,9 +123,9 @@ impl<T: Game> Mcts<T> {
         node_id
     }
 
-    fn expand(&self, node_id: NodeId, db: &mut Database<T>, game: &mut T) -> NodeId {
+    fn expand(&self, node_id: NodeId, db: &mut NodeMap<T>, game: &mut T) -> NodeId {
         debug!("Expanding");
-        let node = db.get_mut(node_id).unwrap();
+        let node = db.get_mut(&node_id).unwrap();
         let action = node.unvisited_moves.pop().unwrap();
         game.step(action.clone()).unwrap();
         let mut new_node = Node::new(game);
@@ -159,9 +137,9 @@ impl<T: Game> Mcts<T> {
         node_id
     }
 
-    fn best_child(&self, db: &Database<T>, node_id: NodeId) -> (T::Action, NodeId) {
+    fn best_child(&self, db: &NodeMap<T>, node_id: NodeId) -> (T::Action, NodeId) {
         // FIXME: select the best child according to the UCB formula
-        let node = db.get(node_id).unwrap();
+        let node = db.get(&node_id).unwrap();
         debug!("children: {:?}", node.children);
         let (action, child_id) = node
             .children
@@ -189,10 +167,10 @@ impl<T: Game> Mcts<T> {
         }
     }
 
-    fn backpropagate(&self, node_id: NodeId, winner: Option<T::Player>, db: &mut Database<T>) {
+    fn backpropagate(&self, node_id: NodeId, winner: Option<T::Player>, db: &mut NodeMap<T>) {
         let mut node_id = node_id;
         loop {
-            let node = db.get_mut(node_id).unwrap();
+            let node = db.get_mut(&node_id).unwrap();
             node.visits += 1;
             if Some(node.to_play.clone()) == winner {
                 node.wins += 1;
@@ -205,11 +183,11 @@ impl<T: Game> Mcts<T> {
         }
     }
 
-    fn best_action(&self, node_id: NodeId, db: &Database<T>) -> T::Action {
-        let node = db.get(node_id).unwrap();
+    fn best_action(&self, node_id: NodeId, db: &NodeMap<T>) -> T::Action {
+        let node = db.get(&node_id).unwrap();
         let mut best_action = None;
         let mut best_value = 0.0;
-        for (action, &child_id) in node.children.iter() {
+        for (action, child_id) in node.children.iter() {
             let child = db.get(child_id).unwrap();
             let value = child.wins as f32 / child.visits as f32;
             let value = 1. - value;
