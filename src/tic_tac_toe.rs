@@ -1,6 +1,8 @@
 use std::fmt;
 use anyhow::{Result, bail};
 
+use crate::game::Game;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum Player {
     X,
@@ -19,16 +21,13 @@ pub(crate) struct TicTacToe {
     pub(crate) current_player: Player,
 }
 
-impl TicTacToe {
-    pub(crate) fn new() -> Self {
-        Self {
-            spots: [[Spot::Empty; 3]; 3],
-            current_player: Player::X,
-        }
-    }
+impl Game for TicTacToe {
+    type Action = (usize, usize);
 
-    // Take a step with a given action
-    pub(crate) fn step(&mut self, row: usize, col: usize) -> Result<f32> {
+    type Player = Player;
+
+    fn step(&mut self, action: Self::Action) -> anyhow::Result<f32> {
+        let (row, col) = action;
         match self.spots[row][col] {
             Spot::Empty => {
                 self.spots[row][col] = Spot::Filled(self.current_player.clone());
@@ -45,7 +44,7 @@ impl TicTacToe {
         }
     }
 
-    pub(crate) fn get_available_moves(&self) -> Vec<(usize, usize)> {
+    fn get_available_moves(&self) -> Vec<Self::Action> {
         let mut available_moves = Vec::new();
         for (i, row) in self.spots.iter().enumerate() {
             for (j, &spot) in row.iter().enumerate() {
@@ -57,12 +56,15 @@ impl TicTacToe {
         available_moves
     }
 
-    pub(crate) fn done(&self) -> bool {
+    fn current_player(&self) -> Self::Player {
+        self.current_player
+    }
+
+    fn done(&self) -> bool {
         self.check_winner().is_some() || self.get_available_moves().is_empty()
     }
 
-    // Check if there's a winner
-    pub(crate) fn check_winner(&self) -> Option<Player> {
+    fn check_winner(&self) -> Option<Self::Player> {
         // Check rows
         for row in 0..3 {
             if let Spot::Filled(player) = self.spots[row][0] {
@@ -97,6 +99,15 @@ impl TicTacToe {
     }
 }
 
+impl TicTacToe {
+    pub(crate) fn new() -> Self {
+        Self {
+            spots: [[Spot::Empty; 3]; 3],
+            current_player: Player::X,
+        }
+    }
+}
+
 impl fmt::Display for TicTacToe {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for row in &self.spots {
@@ -128,15 +139,15 @@ mod tests {
     #[test]
     fn test_step() {
         let mut game = TicTacToe::new();
-        assert!(game.step(0, 0).is_ok());
+        assert!(game.step((0, 0)).is_ok());
         assert_eq!(game.spots[0][0], Spot::Filled(Player::X));
         assert_eq!(game.current_player, Player::O);
 
-        assert!(game.step(0, 0).is_err());
+        assert!(game.step((0, 0)).is_err());
         assert_eq!(game.spots[0][0], Spot::Filled(Player::X));
         assert_eq!(game.current_player, Player::O);
 
-        assert!(game.step(0, 1).is_ok());
+        assert!(game.step((0, 1)).is_ok());
         assert_eq!(game.spots[0][1], Spot::Filled(Player::O));
         assert_eq!(game.current_player, Player::X);
     }

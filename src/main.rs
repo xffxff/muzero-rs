@@ -1,5 +1,6 @@
 mod tic_tac_toe;
 mod mcts;
+mod game;
 
 use std::io;
 
@@ -7,12 +8,13 @@ use mcts::MCTS;
 use tic_tac_toe::TicTacToe;
 
 use crate::tic_tac_toe::Player;
+use crate::game::Game;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let mut game = TicTacToe::new();
-    let mcts = MCTS {};
+    let mcts = MCTS::<TicTacToe>::new();
 
     loop {
         println!("{}", game);
@@ -43,7 +45,7 @@ fn main() -> anyhow::Result<()> {
             },
         };
 
-        game.step(row, col)?;
+        game.step((row, col))?;
     }
 
     Ok(())

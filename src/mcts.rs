@@ -3,10 +3,10 @@ use std::{sync::atomic::AtomicUsize, collections::HashMap, hash::Hash};
 use log::debug;
 use rand::seq::IteratorRandom;
 
-use crate::tic_tac_toe::{TicTacToe, Player};
+use crate::game::Game;
 
-pub(crate) struct MCTS {
-
+pub(crate) struct MCTS<T: Game> {
+    _phantom: std::marker::PhantomData<T>,
 }
 
 static NODE_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -20,23 +20,23 @@ impl NodeId {
     }
 }
 
-struct Node {
+struct Node<T: Game> {
     visits: usize,
     wins: usize,
-    to_play: Player,
+    to_play: T::Player,
     parent: Option<NodeId>,
-    children: HashMap<(usize, usize), NodeId>,
-    unvisited_moves: Vec<(usize, usize)>,
+    children: HashMap<T::Action, NodeId>,
+    unvisited_moves: Vec<T::Action>,
     done: bool,
 }
 
-impl Node {
-    fn new(game: &TicTacToe) -> Self {
+impl<T:Game> Node<T> {
+    fn new(game: &T) -> Self {
         let available_moves = game.get_available_moves();
         Self {
             visits: 0,
             wins: 0,
-            to_play: game.current_player,
+            to_play: game.current_player(),
             parent: None,
             children: HashMap::new(),
             unvisited_moves: available_moves,
@@ -45,32 +45,38 @@ impl Node {
     }
 }
 
-struct Database {
-    nodes: HashMap<NodeId, Node>,
+struct Database<T: Game> {
+    nodes: HashMap<NodeId, Node<T>>,
 }
 
-impl Database {
+impl<T: Game> Database<T> {
     fn new() -> Self {
         Self {
             nodes: HashMap::new(),
         }
     }
 
-    fn get(&self, id: NodeId) -> Option<&Node> {
+    fn get(&self, id: NodeId) -> Option<&Node<T>> {
         self.nodes.get(&id)
     }
 
-    fn get_mut(&mut self, id: NodeId) -> Option<&mut Node> {
+    fn get_mut(&mut self, id: NodeId) -> Option<&mut Node<T>> {
         self.nodes.get_mut(&id)
     }
 
-    fn insert(&mut self, id: NodeId, node: Node) {
+    fn insert(&mut self, id: NodeId, node: Node<T>) {
         self.nodes.insert(id, node);
     }
 }
 
-impl MCTS {
-    pub(crate) fn select_move(&self, game: &TicTacToe) -> anyhow::Result<(usize, usize)> {
+impl<T: Game> MCTS<T> {
+    pub(crate) fn new() -> Self {
+        Self {
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub(crate) fn select_move(&self, game: &T) -> anyhow::Result<T::Action> {
         let root = Node::new(game);
         let root_id = NodeId::new();
         let mut db = Database::new();
@@ -89,7 +95,7 @@ impl MCTS {
         Ok(best_action)
     }
 
-    fn print_tree(root: NodeId, db: &Database, indent: usize) -> String {
+    fn print_tree(root: NodeId, db: &Database<T>, indent: usize) -> String {
         fn indent_str(indent: usize) -> String {
             let mut s = "".to_string();
             for _ in 0..indent {
@@ -106,7 +112,7 @@ impl MCTS {
 
         // s.push_str(indent_str(indent).as_str());
         // s.push_str(&format!("{:?}: {:?} / {:?}\n", node.to_play, node.wins, node.visits));
-        for (&action, &child_id) in node.children.iter() {
+        for (action, &child_id) in node.children.iter() {
             let child = db.get(child_id).unwrap();
             s.push_str(indent_str(indent).as_str());
             s.push_str(&format!("  {:?} make move {:?} win rate for {:?}: {:?}/{:?} \n", node.to_play, action, child.to_play, child.wins, child.visits));
@@ -115,7 +121,7 @@ impl MCTS {
         s
     }
 
-    fn tree_policy(&self, root: NodeId, db: &mut Database, game: &mut TicTacToe) -> NodeId {
+    fn tree_policy(&self, root: NodeId, db: &mut Database<T>, game: &mut T) -> NodeId {
         let mut node_id = root;
         loop {
             let node = db.get(node_id).unwrap();
@@ -127,7 +133,7 @@ impl MCTS {
                 return self.expand(node_id, db, game);
             } else {
                 let (action, child) = self.best_child(db, node_id);
-                game.step(action.0, action.1).unwrap();
+                game.step(action).unwrap();
                 debug!("\n{game}");
                 node_id = child;
             }
@@ -135,11 +141,11 @@ impl MCTS {
         node_id
     }
 
-    fn expand(&self, node_id: NodeId, db: &mut Database, game: &mut TicTacToe) -> NodeId {
+    fn expand(&self, node_id: NodeId, db: &mut Database<T>, game: &mut T) -> NodeId {
         debug!("Expanding");
         let node = db.get_mut(node_id).unwrap();
         let action = node.unvisited_moves.pop().unwrap();
-        game.step(action.0, action.1).unwrap();
+        game.step(action.clone()).unwrap();
         let mut new_node = Node::new(game);
         new_node.parent = Some(node_id);
         let node_id = NodeId::new();
@@ -149,15 +155,15 @@ impl MCTS {
         node_id
     }
 
-    fn best_child(&self, db: &Database, node_id: NodeId) -> ((usize, usize), NodeId) {
+    fn best_child(&self, db: &Database<T>, node_id: NodeId) -> (T::Action, NodeId) {
         // FIXME: select the best child according to the UCB formula
         let node = db.get(node_id).unwrap();
         debug!("children: {:?}", node.children);
         let (action, child_id) = node.children.iter().choose(&mut rand::thread_rng()).unwrap();
-        (*action, *child_id)
+        (action.clone(), *child_id)
     }
 
-    fn default_policy(&self, game: &mut TicTacToe) -> Option<Player> {
+    fn default_policy(&self, game: &mut T) -> Option<T::Player> {
         loop {
             if let Some(winner) = game.check_winner() {
                 return Some(winner);
@@ -167,17 +173,17 @@ impl MCTS {
                 return None;
             }
             let action = available_moves.iter().choose(&mut rand::thread_rng()).unwrap();
-            game.step(action.0, action.1).unwrap();
+            game.step(action.clone()).unwrap();
             debug!("\n{game}");
         }
     }
 
-    fn backpropagate(&self, node_id: NodeId, winner: Option<Player>, db: &mut Database) {
+    fn backpropagate(&self, node_id: NodeId, winner: Option<T::Player>, db: &mut Database<T>) {
         let mut node_id = node_id;
         loop {
             let node = db.get_mut(node_id).unwrap();
             node.visits += 1;
-            if Some(node.to_play) == winner {
+            if Some(node.to_play.clone()) == winner {
                 node.wins += 1;
             }
             if let Some(parent_id) = node.parent {
@@ -188,11 +194,11 @@ impl MCTS {
         }
     }
 
-    fn best_action(&self, node_id: NodeId, db: &Database) -> (usize, usize) {
+    fn best_action(&self, node_id: NodeId, db: &Database<T>) -> T::Action {
         let node = db.get(node_id).unwrap();
         let mut best_action = None;
         let mut best_value = 0.0;
-        for (&action, &child_id) in node.children.iter() {
+        for (action, &child_id) in node.children.iter() {
             let child = db.get(child_id).unwrap();
             let value = child.wins as f32 / child.visits as f32;
             let value = 1. - value;
@@ -203,6 +209,6 @@ impl MCTS {
             }
         }
         debug!("best action: {:?}", best_action);
-        best_action.unwrap()
+        best_action.unwrap().clone()
     }
 }
