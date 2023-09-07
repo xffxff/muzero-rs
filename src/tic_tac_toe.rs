@@ -57,6 +57,10 @@ impl TicTacToe {
         available_moves
     }
 
+    pub(crate) fn done(&self) -> bool {
+        self.check_winner().is_some() || self.get_available_moves().is_empty()
+    }
+
     // Check if there's a winner
     pub(crate) fn check_winner(&self) -> Option<Player> {
         // Check rows

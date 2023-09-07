@@ -9,15 +9,22 @@ use tic_tac_toe::TicTacToe;
 use crate::tic_tac_toe::Player;
 
 fn main() -> anyhow::Result<()> {
+    env_logger::init();
+
     let mut game = TicTacToe::new();
     let mcts = MCTS {};
 
     loop {
         println!("{}", game);
 
-        if let Some(winner) = game.check_winner() {
-            println!("Player {:?} wins!", winner);
-            break;
+        if game.done() {
+            if let Some(winner) = game.check_winner() {
+                println!("Player {:?} wins!", winner);
+                break;
+            } else {
+                println!("Draw!");
+                break;
+            }
         }
 
         let (row, col) = match game.current_player {
