@@ -1,11 +1,11 @@
-use std::{sync::atomic::AtomicUsize, collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash, sync::atomic::AtomicUsize};
 
 use log::debug;
 use rand::seq::IteratorRandom;
 
 use crate::game::Game;
 
-pub(crate) struct MCTS<T: Game> {
+pub(crate) struct Mcts<T: Game> {
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -30,7 +30,7 @@ struct Node<T: Game> {
     done: bool,
 }
 
-impl<T:Game> Node<T> {
+impl<T: Game> Node<T> {
     fn new(game: &T) -> Self {
         let available_moves = game.get_available_moves();
         Self {
@@ -40,7 +40,7 @@ impl<T:Game> Node<T> {
             parent: None,
             children: HashMap::new(),
             unvisited_moves: available_moves,
-            done: game.done()
+            done: game.done(),
         }
     }
 }
@@ -69,7 +69,7 @@ impl<T: Game> Database<T> {
     }
 }
 
-impl<T: Game> MCTS<T> {
+impl<T: Game> Mcts<T> {
     pub(crate) fn new() -> Self {
         Self {
             _phantom: std::marker::PhantomData,
@@ -99,7 +99,7 @@ impl<T: Game> MCTS<T> {
         fn indent_str(indent: usize) -> String {
             let mut s = "".to_string();
             for _ in 0..indent {
-                s.push_str(" ")
+                s.push(' ')
             }
             s
         }
@@ -107,7 +107,10 @@ impl<T: Game> MCTS<T> {
         let node = db.get(root).unwrap();
 
         if indent == 0 {
-            s.push_str(&format!("win rate for {:?}: {:?} / {:?}\n", node.to_play, node.wins, node.visits));
+            s.push_str(&format!(
+                "win rate for {:?}: {:?} / {:?}\n",
+                node.to_play, node.wins, node.visits
+            ));
         }
 
         // s.push_str(indent_str(indent).as_str());
@@ -115,7 +118,10 @@ impl<T: Game> MCTS<T> {
         for (action, &child_id) in node.children.iter() {
             let child = db.get(child_id).unwrap();
             s.push_str(indent_str(indent).as_str());
-            s.push_str(&format!("  {:?} make move {:?} win rate for {:?}: {:?}/{:?} \n", node.to_play, action, child.to_play, child.wins, child.visits));
+            s.push_str(&format!(
+                "  {:?} make move {:?} win rate for {:?}: {:?}/{:?} \n",
+                node.to_play, action, child.to_play, child.wins, child.visits
+            ));
             s.push_str(&Self::print_tree(child_id, db, indent + 4));
         }
         s
@@ -129,7 +135,7 @@ impl<T: Game> MCTS<T> {
                 debug!("Found a winner");
                 break;
             }
-            if node.unvisited_moves.len() > 0 {
+            if !node.unvisited_moves.is_empty() {
                 return self.expand(node_id, db, game);
             } else {
                 let (action, child) = self.best_child(db, node_id);
@@ -159,7 +165,11 @@ impl<T: Game> MCTS<T> {
         // FIXME: select the best child according to the UCB formula
         let node = db.get(node_id).unwrap();
         debug!("children: {:?}", node.children);
-        let (action, child_id) = node.children.iter().choose(&mut rand::thread_rng()).unwrap();
+        let (action, child_id) = node
+            .children
+            .iter()
+            .choose(&mut rand::thread_rng())
+            .unwrap();
         (action.clone(), *child_id)
     }
 
@@ -169,10 +179,13 @@ impl<T: Game> MCTS<T> {
                 return Some(winner);
             }
             let available_moves = game.get_available_moves();
-            if available_moves.len() == 0 {
+            if available_moves.is_empty() {
                 return None;
             }
-            let action = available_moves.iter().choose(&mut rand::thread_rng()).unwrap();
+            let action = available_moves
+                .iter()
+                .choose(&mut rand::thread_rng())
+                .unwrap();
             game.step(action.clone()).unwrap();
             debug!("\n{game}");
         }

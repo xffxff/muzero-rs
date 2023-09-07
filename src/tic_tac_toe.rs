@@ -1,5 +1,5 @@
+use anyhow::bail;
 use std::fmt;
-use anyhow::{Result, bail};
 
 use crate::game::Game;
 
@@ -30,7 +30,7 @@ impl Game for TicTacToe {
         let (row, col) = action;
         match self.spots[row][col] {
             Spot::Empty => {
-                self.spots[row][col] = Spot::Filled(self.current_player.clone());
+                self.spots[row][col] = Spot::Filled(self.current_player);
                 self.current_player = match self.current_player {
                     Player::X => Player::O,
                     Player::O => Player::X,
@@ -39,7 +39,7 @@ impl Game for TicTacToe {
                 let terminated = self.check_winner().is_some(); // Check if the game has a winner
                 let reward = if terminated { 1.0 } else { 0.0 }; // Implement according to your needs
                 Ok(reward)
-            },
+            }
             Spot::Filled(_) => bail!("Spot is already filled"),
         }
     }
@@ -68,8 +68,10 @@ impl Game for TicTacToe {
         // Check rows
         for row in 0..3 {
             if let Spot::Filled(player) = self.spots[row][0] {
-                if self.spots[row][1] == Spot::Filled(player) && self.spots[row][2] == Spot::Filled(player) {
-                    return Some(player.clone());
+                if self.spots[row][1] == Spot::Filled(player)
+                    && self.spots[row][2] == Spot::Filled(player)
+                {
+                    return Some(player);
                 }
             }
         }
@@ -77,21 +79,25 @@ impl Game for TicTacToe {
         // Check columns
         for col in 0..3 {
             if let Spot::Filled(player) = self.spots[0][col] {
-                if self.spots[1][col] == Spot::Filled(player) && self.spots[2][col] == Spot::Filled(player) {
-                    return Some(player.clone());
+                if self.spots[1][col] == Spot::Filled(player)
+                    && self.spots[2][col] == Spot::Filled(player)
+                {
+                    return Some(player);
                 }
             }
         }
 
         // Check diagonals
         if let Spot::Filled(player) = self.spots[0][0] {
-            if self.spots[1][1] == Spot::Filled(player) && self.spots[2][2] == Spot::Filled(player) {
-                return Some(player.clone());
+            if self.spots[1][1] == Spot::Filled(player) && self.spots[2][2] == Spot::Filled(player)
+            {
+                return Some(player);
             }
         }
         if let Spot::Filled(player) = self.spots[0][2] {
-            if self.spots[1][1] == Spot::Filled(player) && self.spots[2][0] == Spot::Filled(player) {
-                return Some(player.clone());
+            if self.spots[1][1] == Spot::Filled(player) && self.spots[2][0] == Spot::Filled(player)
+            {
+                return Some(player);
             }
         }
 
@@ -172,8 +178,16 @@ mod tests {
         assert_eq!(game.check_winner(), Some(Player::O));
 
         game.spots = [
-            [Spot::Filled(Player::X), Spot::Filled(Player::O), Spot::Empty],
-            [Spot::Empty, Spot::Filled(Player::X), Spot::Filled(Player::O)],
+            [
+                Spot::Filled(Player::X),
+                Spot::Filled(Player::O),
+                Spot::Empty,
+            ],
+            [
+                Spot::Empty,
+                Spot::Filled(Player::X),
+                Spot::Filled(Player::O),
+            ],
             [Spot::Filled(Player::O), Spot::Empty, Spot::Empty],
         ];
         assert_eq!(game.check_winner(), None);
