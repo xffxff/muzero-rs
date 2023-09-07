@@ -113,8 +113,6 @@ impl<T: Game> Mcts<T> {
             ));
         }
 
-        // s.push_str(indent_str(indent).as_str());
-        // s.push_str(&format!("{:?}: {:?} / {:?}\n", node.to_play, node.wins, node.visits));
         for (action, &child_id) in node.children.iter() {
             let child = db.get(child_id).unwrap();
             s.push_str(indent_str(indent).as_str());
