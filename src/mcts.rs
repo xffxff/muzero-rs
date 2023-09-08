@@ -92,7 +92,23 @@ impl<T: Game> Mcts<T> {
     }
 
     fn best_child(&self, db: &NodeMap<T>, node_id: NodeId) -> (T::Action, NodeId) {
-        todo!()
+        // select the child node with the highest UCT value.
+        let node = db.get(&node_id).unwrap();
+        let mut best_action = None;
+        let mut best_node_id = None;
+        let mut best_value = 0.0;
+        for (action, child_id) in node.children.iter() {
+            let child = db.get(child_id).unwrap();
+            let win_rate_for_opponent = child.wins as f32 / child.visits as f32;
+            let win_rate = 1. - win_rate_for_opponent;
+            let value = win_rate + (2. * (node.visits as f32).ln() / child.visits as f32).sqrt();
+            if best_action.is_none() || value > best_value {
+                best_action = Some(action);
+                best_node_id = Some(child_id);
+                best_value = value;
+            }
+        }
+        (best_action.unwrap().clone(), best_node_id.unwrap().clone())
     }
 
     fn apply_actions(&self, game: &mut T, actions: Vec<T::Action>) {
