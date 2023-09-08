@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let mut game = TicTacToe::new();
-    let mcts = Mcts::<TicTacToe>::new();
+    let mcts = Mcts::<TicTacToe>::new(100);
 
     loop {
         println!("{}", game);

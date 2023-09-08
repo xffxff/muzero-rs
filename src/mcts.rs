@@ -1,12 +1,12 @@
 use std::{collections::HashMap, hash::Hash, sync::atomic::AtomicUsize};
 
-use log::debug;
 use rand::seq::IteratorRandom;
 
 use crate::game::Game;
 
 pub(crate) struct Mcts<T: Game> {
     _phantom: std::marker::PhantomData<T>,
+    num_simulations: usize,
 }
 
 static NODE_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -51,9 +51,10 @@ impl<T: Game> Node<T> {
 type NodeMap<T> = HashMap<NodeId, Node<T>>;
 
 impl<T: Game> Mcts<T> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(num_simulations: usize) -> Self {
         Self {
             _phantom: std::marker::PhantomData,
+            num_simulations,
         }
     }
 
@@ -61,12 +62,14 @@ impl<T: Game> Mcts<T> {
         let mut db = NodeMap::new();
         let root = Node::new(&mut db, game, None);
 
-        let (path, leaf) = self.selection(&db, root);
-        let mut game = game.clone();
-        self.apply_actions(&mut game, path);
-        let expanded_node = self.expansion(&mut db, leaf, &mut game);
-        let winner = self.simulation(&mut game);
-        self.backpropagation(&mut db, expanded_node, winner);
+        for _ in 0..self.num_simulations {
+            let (path, leaf) = self.selection(&db, root);
+            let mut game = game.clone();
+            self.apply_actions(&mut game, path);
+            let expanded_node = self.expansion(&mut db, leaf, &mut game);
+            let winner = self.simulation(&mut game);
+            self.backpropagation(&mut db, expanded_node, winner);
+        }
         self.best_action(&db, root)
     }
 
@@ -363,7 +366,7 @@ mod tests {
     #[test]
     fn test_mcts() {
         let game = TicTacToe::new();
-        let mcts = Mcts::<TicTacToe>::new();
+        let mcts = Mcts::<TicTacToe>::new(100);
         let action = mcts.search(&game);
         println!("{:?}", action);
     }
