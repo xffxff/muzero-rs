@@ -22,7 +22,7 @@ impl NodeId {
 
 struct Node<T: Game> {
     visits: usize,
-    reward: f32,
+    value: f32,
     to_play: T::Player,
     parent: Option<NodeId>,
     children: HashMap<T::Action, NodeId>,
@@ -35,7 +35,7 @@ impl<T: Game> Node<T> {
         let available_moves = game.get_available_moves();
         let node = Node {
             visits: 0,
-            reward: 0.,
+            value: 0.,
             to_play: game.current_player(),
             parent,
             children: HashMap::new(),
@@ -64,8 +64,9 @@ impl<T: Game> Mcts<T> {
         let (path, leaf) = self.selection(&db, root);
         let mut game = game.clone();
         self.apply_actions(&mut game, path);
-        self.expansion(&mut db, leaf, &mut game);
+        let expanded_node = self.expansion(&mut db, leaf, &mut game);
         let winner = self.simulation(&mut game);
+        self.backpropagation(&mut db, expanded_node, winner);
         todo!()
     }
 
@@ -139,6 +140,30 @@ impl<T: Game> Mcts<T> {
             game.step(action.clone()).unwrap();
         }
     }
+
+    fn backpropagation(&self, db: &mut NodeMap<T>, node_id: NodeId, winner: Option<T::Player>) {
+        // Update the current move sequence with the simulation result. 
+        // Backpropagate this result up the tree. This updates the win and visit count of each node.
+
+        let mut node_id = node_id;
+        loop {
+            let node = db.get_mut(&node_id).unwrap();
+            node.visits += 1;
+            if let Some(winner) = &winner {
+                if &node.to_play == winner {
+                    node.value += 1.;
+                }
+            } else {
+                node.value += 0.5;
+            }
+            if let Some(parent_id) = node.parent {
+                node_id = parent_id;
+            } else {
+                break;
+            }
+        }
+    }
+
 
     // pub(crate) fn select_move(&self, game: &T) -> anyhow::Result<T::Action> {
     //     let root = Node::new(game);
