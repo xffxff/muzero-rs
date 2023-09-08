@@ -138,7 +138,6 @@ impl<T: Game> Mcts<T> {
     }
 
     fn best_child(&self, db: &NodeMap<T>, node_id: NodeId) -> (T::Action, NodeId) {
-        // FIXME: select the best child according to the UCB formula
         let node = db.get(&node_id).unwrap();
         let mut best_action = None;
         let mut best_node_id = None;
