@@ -31,17 +31,20 @@ struct Node<T: Game> {
 }
 
 impl<T: Game> Node<T> {
-    fn new(game: &T) -> Self {
+    fn new(db: &mut NodeMap<T>, game: &T, parent: Option<NodeId>) -> NodeId {
         let available_moves = game.get_available_moves();
-        Self {
+        let node = Node {
             visits: 0,
             reward: 0.,
             to_play: game.current_player(),
-            parent: None,
+            parent,
             children: HashMap::new(),
             unvisited_actions: available_moves,
             done: game.done(),
-        }
+        };
+        let node_id = NodeId::new();
+        db.insert(node_id, node);
+        node_id
     }
 }
 
@@ -55,14 +58,19 @@ impl<T: Game> Mcts<T> {
     }
 
     pub(crate) fn search(&self, game: &T) -> T::Action {
-        let root = Node::new(game);
-        let root_id = NodeId::new();
         let mut db = NodeMap::new();
-        db.insert(root_id, root);
+        let root = Node::new(&mut db, game, None);
+        let root_id = NodeId::new();
+
+        let (path, leaf) = self.selection(&db, root_id);
+        let mut game = game.clone();
+        self.apply_actions(&mut game, path);
         todo!()
     }
 
-    fn selection(&self, root_id: NodeId, db: &mut NodeMap<T>) -> Vec<T::Action> {
+    fn selection(&self, db: &NodeMap<T>, root_id: NodeId) -> (Vec<T::Action>, NodeId) {
+        // Start from root R and select successive child nodes until a leaf node L is reached. 
+        // The root is the current game state and a leaf is any node that has a potential child from which no simulation (playout) has yet been initiated.
         let mut node_id = root_id;
         let mut path = vec![];
         loop {
@@ -70,8 +78,39 @@ impl<T: Game> Mcts<T> {
             if node.done {
                 break;
             }
+            if node.unvisited_actions.is_empty() {
+                let (action, child_id) = self.best_child(db, node_id);
+                path.push(action);
+                node_id = child_id;
+            } else {
+                break;
+            }
         }
-        path
+        (path, node_id)
+    }
+
+    fn best_child(&self, db: &NodeMap<T>, node_id: NodeId) -> (T::Action, NodeId) {
+        todo!()
+    }
+
+    fn apply_actions(&self, game: &mut T, actions: Vec<T::Action>) {
+        for action in actions {
+            game.step(action).unwrap();
+        }
+    }
+
+    fn expansion(&self, db: &mut NodeMap<T>, node_id: NodeId, game: &mut T) -> NodeId {
+        let node = db.get_mut(&node_id).unwrap();
+        if node.done {
+            return node_id;
+        }
+
+        // if !node.done, then node.unvisited_actions should not be empty
+        let action = node.unvisited_actions.pop().unwrap();
+        game.step(action.clone()).unwrap();
+        let new_node_id = Node::new(db, game, Some(node_id));
+        node.children.insert(action, new_node_id);
+        new_node_id
     }
 
     // pub(crate) fn select_move(&self, game: &T) -> anyhow::Result<T::Action> {
@@ -240,14 +279,10 @@ mod tests {
     use crate::tic_tac_toe::TicTacToe;
 
     #[test]
-    fn test_selection() {
-        let mcts = Mcts::<TicTacToe>::new();
+    fn test_mcts() {
         let game = TicTacToe::new();
-        let root = Node::new(&game);
-        let root_id = NodeId::new();
-        let mut db = NodeMap::new();
-        db.insert(root_id, root);
-        let path = mcts.selection(root_id, &mut db);
-        assert_eq!(path.len(), 9);
+        let mcts = Mcts::<TicTacToe>::new();
+        let action = mcts.search(&game);
+        println!("{:?}", action);
     }
 }
