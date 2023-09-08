@@ -231,6 +231,6 @@ mod tests {
         let game = TicTacToe::new();
         let mcts = Mcts::<TicTacToe>::new(100);
         let action = mcts.search(&game);
-        println!("{:?}", action);
+        assert!(action == (1, 1))
     }
 }
