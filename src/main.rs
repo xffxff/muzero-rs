@@ -41,7 +41,7 @@ fn main() -> anyhow::Result<()> {
             }
             Player::O => {
                 // Use MCTS to select the best move
-                mcts.select_move(&game)?
+                mcts.search(&game)
             }
         };
 
