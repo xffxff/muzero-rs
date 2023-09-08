@@ -60,11 +60,11 @@ impl<T: Game> Mcts<T> {
     pub(crate) fn search(&self, game: &T) -> T::Action {
         let mut db = NodeMap::new();
         let root = Node::new(&mut db, game, None);
-        let root_id = NodeId::new();
 
-        let (path, leaf) = self.selection(&db, root_id);
+        let (path, leaf) = self.selection(&db, root);
         let mut game = game.clone();
         self.apply_actions(&mut game, path);
+        self.expansion(&mut db, leaf, &mut game);
         todo!()
     }
 
@@ -100,15 +100,23 @@ impl<T: Game> Mcts<T> {
     }
 
     fn expansion(&self, db: &mut NodeMap<T>, node_id: NodeId, game: &mut T) -> NodeId {
-        let node = db.get_mut(&node_id).unwrap();
+        // Unless L ends the game decisively (e.g. win/loss/draw) for either player,
+        // create a new child node N of L and move to it.
+
+        let node = db.get(&node_id).unwrap();
         if node.done {
             return node_id;
         }
 
-        // if !node.done, then node.unvisited_actions should not be empty
-        let action = node.unvisited_actions.pop().unwrap();
+        let action = {
+            let node = db.get_mut(&node_id).unwrap();
+            // if !node.done, then node.unvisited_actions should not be empty
+            node.unvisited_actions.pop().unwrap()
+        };
+
         game.step(action.clone()).unwrap();
         let new_node_id = Node::new(db, game, Some(node_id));
+        let node = db.get_mut(&node_id).unwrap();
         node.children.insert(action, new_node_id);
         new_node_id
     }
