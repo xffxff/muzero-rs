@@ -22,7 +22,7 @@ impl NodeId {
 
 struct Node<T: Game> {
     visits: usize,
-    value: f32,
+    wins: usize,
     to_play: T::Player,
     parent: Option<NodeId>,
     children: HashMap<T::Action, NodeId>,
@@ -35,7 +35,7 @@ impl<T: Game> Node<T> {
         let available_moves = game.get_available_moves();
         let node = Node {
             visits: 0,
-            value: 0.,
+            wins: 0,
             to_play: game.current_player(),
             parent,
             children: HashMap::new(),
@@ -67,7 +67,7 @@ impl<T: Game> Mcts<T> {
         let expanded_node = self.expansion(&mut db, leaf, &mut game);
         let winner = self.simulation(&mut game);
         self.backpropagation(&mut db, expanded_node, winner);
-        todo!()
+        self.best_action(&db, root)
     }
 
     fn selection(&self, db: &NodeMap<T>, root_id: NodeId) -> (Vec<T::Action>, NodeId) {
@@ -151,10 +151,8 @@ impl<T: Game> Mcts<T> {
             node.visits += 1;
             if let Some(winner) = &winner {
                 if &node.to_play == winner {
-                    node.value += 1.;
+                    node.wins += 1;
                 }
-            } else {
-                node.value += 0.5;
             }
             if let Some(parent_id) = node.parent {
                 node_id = parent_id;
@@ -162,6 +160,22 @@ impl<T: Game> Mcts<T> {
                 break;
             }
         }
+    }
+
+    fn best_action(&self, db: &NodeMap<T>, node_id: NodeId) -> T::Action {
+        let node = db.get(&node_id).unwrap();
+        let mut best_action = None;
+        let mut best_value = 0.0;
+        for (action, child_id) in node.children.iter() {
+            let child = db.get(child_id).unwrap();
+            let win_rate_for_opponent = child.wins as f32 / child.visits as f32;
+            let win_rate = 1. - win_rate_for_opponent;
+            if best_action.is_none() || win_rate > best_value {
+                best_action = Some(action);
+                best_value = win_rate;
+            }
+        }
+        best_action.unwrap().clone()
     }
 
 
