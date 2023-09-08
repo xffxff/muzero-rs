@@ -65,6 +65,7 @@ impl<T: Game> Mcts<T> {
         let mut game = game.clone();
         self.apply_actions(&mut game, path);
         self.expansion(&mut db, leaf, &mut game);
+        let winner = self.simulation(&mut game);
         todo!()
     }
 
@@ -119,6 +120,24 @@ impl<T: Game> Mcts<T> {
         let node = db.get_mut(&node_id).unwrap();
         node.children.insert(action, new_node_id);
         new_node_id
+    }
+
+    fn simulation(&self, game: &mut T) -> Option<T::Player> {
+        // Play a random playout from node N. This is typically done by selecting uniform random moves until the game is finished.
+        loop {
+            if let Some(winner) = game.check_winner() {
+                return Some(winner);
+            }
+            let available_moves = game.get_available_moves();
+            if available_moves.is_empty() {
+                return None;
+            }
+            let action = available_moves
+                .iter()
+                .choose(&mut rand::thread_rng())
+                .unwrap();
+            game.step(action.clone()).unwrap();
+        }
     }
 
     // pub(crate) fn select_move(&self, game: &T) -> anyhow::Result<T::Action> {
