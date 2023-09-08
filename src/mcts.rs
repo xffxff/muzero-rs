@@ -22,7 +22,7 @@ impl NodeId {
 
 struct Node<T: Game> {
     visits: usize,
-    wins: usize,
+    reward: f32,
     to_play: T::Player,
     parent: Option<NodeId>,
     children: HashMap<T::Action, NodeId>,
@@ -35,7 +35,7 @@ impl<T: Game> Node<T> {
         let available_moves = game.get_available_moves();
         Self {
             visits: 0,
-            wins: 0,
+            reward: 0.,
             to_play: game.current_player(),
             parent: None,
             children: HashMap::new(),
@@ -87,7 +87,7 @@ impl<T: Game> Mcts<T> {
         if indent == 0 {
             s.push_str(&format!(
                 "win rate for {:?}: {:?} / {:?}\n",
-                node.to_play, node.wins, node.visits
+                node.to_play, node.reward, node.visits
             ));
         }
 
@@ -96,7 +96,7 @@ impl<T: Game> Mcts<T> {
             s.push_str(indent_str(indent).as_str());
             s.push_str(&format!(
                 "  {:?} make move {:?} win rate for {:?}: {:?}/{:?} \n",
-                node.to_play, action, child.to_play, child.wins, child.visits
+                node.to_play, action, child.to_play, child.reward, child.visits
             ));
             s.push_str(&Self::print_tree(*child_id, db, indent + 4));
         }
@@ -140,13 +140,22 @@ impl<T: Game> Mcts<T> {
     fn best_child(&self, db: &NodeMap<T>, node_id: NodeId) -> (T::Action, NodeId) {
         // FIXME: select the best child according to the UCB formula
         let node = db.get(&node_id).unwrap();
-        debug!("children: {:?}", node.children);
-        let (action, child_id) = node
-            .children
-            .iter()
-            .choose(&mut rand::thread_rng())
-            .unwrap();
-        (action.clone(), *child_id)
+        let mut best_action = None;
+        let mut best_node_id = None;
+        let mut best_value = 0.0;
+        for (action, child_id) in node.children.iter() {
+            let child = db.get(child_id).unwrap();
+            let value = child.reward / child.visits as f32;
+            let mut value = 1. - value;
+            value += (2. * (node.visits as f32).ln() / child.visits as f32).sqrt();
+            debug!("action: {:?}, value: {:?}", action, value);
+            if best_action.is_none() || value > best_value {
+                best_action = Some(action);
+                best_node_id = Some(child_id);
+                best_value = value;
+            }
+        }
+        (best_action.unwrap().clone(), best_node_id.unwrap().clone())
     }
 
     fn default_policy(&self, game: &mut T) -> Option<T::Player> {
@@ -172,8 +181,12 @@ impl<T: Game> Mcts<T> {
         loop {
             let node = db.get_mut(&node_id).unwrap();
             node.visits += 1;
-            if Some(node.to_play.clone()) == winner {
-                node.wins += 1;
+            if let Some(winner) = &winner {
+                if &node.to_play == winner {
+                    node.reward += 1.;
+                }
+            } else {
+                node.reward += 0.5;
             }
             if let Some(parent_id) = node.parent {
                 node_id = parent_id;
@@ -189,7 +202,7 @@ impl<T: Game> Mcts<T> {
         let mut best_value = 0.0;
         for (action, child_id) in node.children.iter() {
             let child = db.get(child_id).unwrap();
-            let value = child.wins as f32 / child.visits as f32;
+            let value = child.reward as f32 / child.visits as f32;
             let value = 1. - value;
             debug!("action: {:?}, value: {:?}", action, value);
             if best_action.is_none() || value > best_value {
